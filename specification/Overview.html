@@ -1,0 +1,2222 @@
+
+<html lang=en>
+ <head>
+  <title>XML5</title>
+
+  <style>
+   pre.idl { border:solid thin; background:#eee; color:#000; padding:0.5em }
+   pre.idl :link, pre.idl :visited { color:inherit; background:transparent }
+   pre code { color:inherit; background:transparent }
+   div.example { margin-left:1em; padding-left:1em; border-left:double; color:#222; background:#fcfcfc }
+   .note { margin-left:2em; font-weight:bold; font-style:italic; color:#008000 }
+   p.note::before { content:"Note: " }
+   .issue { padding:.5em; border:solid #f00 }
+   p.issue::before { content:"Issue: " }
+   em.ct { text-transform:lowercase; font-variant:small-caps; font-style:normal }
+   dfn { font-weight:bold; font-style:normal }
+   code { color:orangered }
+   code :link, code :visited { color:inherit }
+   dl.switch { padding-left: 2em; }
+   dl.switch dt { text-indent: -1.5em; }
+   dl.switch dt:before { content: '\21AA'; padding: 0 0.5em 0 0; display: inline-block; width: 1em; text-align: right; line-height: 0.5em; }
+  </style>
+  <link href="http://www.w3.org/StyleSheets/TR/base" rel=stylesheet>
+
+ <body>
+  <h1 id=xml5>XML5</h1>
+
+  <p class=issue>...
+
+  <h2 id=writing><span class=secno>1. </span>Writing XML documents</h2>
+
+  <p class=issue>...
+
+  <h2 id=parsing><span class=secno>2. </span>Parsing XML documents</h2>
+
+  <p><em>This section only applies to user agents, data mining tools, and
+   conformance checkers.</em>
+
+  <p>The rules in this section define the <dfn id=xml-parser>XML
+   parser</dfn>.
+
+  <p>This specification defines the parsing rules for XML documents, whether
+   they are syntactically valid or not. Certain points in the parsing
+   algorithm are said to be <dfn id=parse title="parse error">parse
+   errors</dfn>. The error handling for parse errors is well-defined: user
+   agents <em class=ct>must</em> either act as described below when
+   encountering such problems, or <em class=ct>must</em> abort processing at
+   the first error that they encounter for which they do not wish to apply
+   the rules described below.</p>
+  <!-- XXX -->
+
+  <h3 id=overview><span class=secno>2.1. </span>Overview of the parsing model</h3>
+
+  <p>The input to the XML parsing process consists of a stream of Unicode
+   characters, which is passed through a <span>tokenization</span> stage
+   (lexical analysis) followed by a <span>tree construction</span> stage
+   (semantic analysis). The output is a <code>Document</code> object.
+
+  <h3 id=the-input><span class=secno>2.2. </span>The input stream stage</h3>
+
+  <p>The stream of Unicode characters that consists the input to the
+   tokenization stage will be initially seen by the user agent as a stream of
+   bytes (typically coming over the network or from the local file system).
+   The bytes encode the actual characters according to a particular
+   <em>character encoding</em>, which the user agent must use to decode the
+   bytes into characters.
+
+  <p class=issue>Define how to find the character encoding...
+
+  <h3 id=the-tokenization><span class=secno>2.3. </span>The tokenization
+   stage</h3>
+
+  <p class=issue>...
+
+  <dl>
+   <dt><dfn id=data-state>Data state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0026 (<code>&amp;</code>)
+
+     <dd class=issue>...
+
+     <dt>U+003C (<code>&lt;</code>)
+
+     <dd>Switch to the <a href="#tag-state">tag state</a>.
+
+     <dt>EOF
+
+     <dd>Emit an end-of-file token.
+
+     <dt>Anything else
+
+     <dd>Emit the input character as character token. Stay in this state.
+    </dl>
+
+   <dt><dfn id=tag-state>Tag state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+002F (<code>/</code>)
+
+     <dd>Switch to the <a href="#end-tag">end tag state</a>.
+
+     <dt>U+003F (<code>?</code>)
+
+     <dd>Switch to the <a href="#pi-state">pi state</a>.
+
+     <dt>U+0021 (<code>!</code>)
+
+     <dd>Switch to the <a href="#markup">markup declaration state</a>.
+
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dt>U+003C (<code>&lt;</code>)
+
+     <dt>U+003E (<code>></code>)
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the character in the <a
+      href="#bogus">bogus comment state</a>.
+
+     <dt>Anything else
+
+     <dd>Create a new tag token and set its name to the input character, then
+      switch to the <a href="#tag-name">tag name state</a>.
+    </dl>
+
+   <dt><dfn id=end-tag>End tag state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit a short end tag token and then switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dt>U+003C (<code>&lt;</code>)
+
+     <dt>EOF
+
+     <dd>Unconsume the last two characters and then switch to the <a
+      href="#bogus">bogus comment state</a>.
+
+     <dt>Anything else
+
+     <dd>Create an end tag token and set its name to the input character,
+      then switch to the <a href="#end-tag0">end tag name state</a>.
+    </dl>
+
+   <dt><dfn id=end-tag0>End tag name state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#end-tag1">end tag name after state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the current token and then switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the current input character to the tag name and stay in the
+      current state.
+    </dl>
+
+   <dt><dfn id=end-tag1>End tag name after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the current token and then switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd><a href="#parse">Parse error</a>. Stay in the current state.
+    </dl>
+
+   <dt><dfn id=pi-state>Pi state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#bogus">bogus comment state</a>.
+
+     <dt>Anything else
+
+     <dd>Create a new processing instruction token. Set target to the current
+      input character and data to the empty string. Then switch to the <a
+      href="#pi-target">pi target state</a>.
+    </dl>
+
+   <dt><dfn id=pi-target>Pi target state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#pi-target0">pi target after state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>U+003F (<code>?</code>)
+
+     <dd>Switch to the <a href="#pi-after">pi after state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the current input character to the tag name and stay in the
+      current state.
+    </dl>
+
+   <dt><dfn id=pi-target0>Pi target after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>Anything else
+
+     <dd>Reprocess the current input character in the <a href="#pi-data">pi
+      data state</a>.
+    </dl>
+
+   <dt><dfn id=pi-data>Pi data state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003F (<code>?</code>)
+
+     <dd>Switch to the <a href="#pi-after">pi after state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the current input character to the pi's data and stay in the
+      current state.
+    </dl>
+
+   <dt><dfn id=pi-after>Pi after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the current token and then switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>U+003F (<code>?</code>)
+
+     <dd>Append the current input character to the pi's data and stay in the
+      current state.
+
+     <dt>Anything else
+
+     <dd>Reprocess the current input character in the <a href="#pi-data">pi
+      data state</a>.
+    </dl>
+
+   <dt><dfn id=markup>Markup declaration state</dfn>
+
+   <dd>
+    <p>If the next two characters are both U+002D (<code>-</code>)
+     characters, consume those two characters, create a comment token whose
+     data is the empty string and then switch to the <a
+     href="#comment">comment state</a>.</p>
+
+    <p>Otherwise, if the next seven characters are a case-sensitive match for
+     "[CDATA[", then consume those characters and switch to the <a
+     href="#cdata">CDATA state</a>.</p>
+
+    <p>Otherwise, if the next seven characters are a case-sensitive match for
+     "DOCTYPE", then this is a <a href="#parse">parse error</a>. Consume
+     those characters and switch to the <a href="#doctype">DOCTYPE state</a>.</p>
+    <!-- or should we make them legal? -->
+    <p>Otherwise, this is a <a href="#parse">parse error</a>. Switch to the
+     <a href="#bogus">bogus comment state</a>.</p>
+
+   <dt><dfn id=comment>Comment state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+002D (<code>-</code>)
+
+     <dd>Switch to the <a href="#comment0">comment dash state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the comment token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the current character to the comment data.
+    </dl>
+
+   <dt><dfn id=comment0>Comment dash state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+002D (<code>-</code>)
+
+     <dd>Switch to the <a href="#comment1">comment end state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the comment token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Append a U+002D (<code>-</code>) and the current input character to
+      the comment token's data. Stay in the current state.
+    </dl>
+
+   <dt><dfn id=comment1>Comment end state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the comment token. Switch to the <a href="#data-state">data
+      state</a>.
+
+     <dt>U+002D (<code>-</code>)
+
+     <dd>Append the current input character to the comment token's data. Stay
+      in the current state.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the comment token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Append two U+002D (<code>-</code>) characters and the current input
+      character to the comment token's data. Switch to the <a
+      href="#comment">comment state</a>.
+    </dl>
+
+   <dt><dfn id=cdata>CDATA state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+005D (<code>]</code>)
+
+     <dd>Switch to the <a href="#cdata0">CDATA bracket state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Emit the current input character as character token. Stay in the
+      current state.
+    </dl>
+
+   <dt><dfn id=cdata0>CDATA bracket state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+005D (<code>]</code>)
+
+     <dd>Switch to the <a href="#cdata1">CDATA end state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Emit a U+005D (<code>]</code>) character as character token and also
+      emit the current input character as character token. Stay in the
+      current state.
+    </dl>
+
+   <dt><dfn id=cdata1>CDATA end state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>U+005D (<code>]</code>)
+
+     <dd>Emit the current input character as character token. Stay in the
+      current state.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reconsume the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Emit two U+005D (<code>]</code>) characters as character tokens and
+      also emit the current input character as character token. Switch to the
+      <a href="#cdata">CDATA state</a>.
+    </dl>
+
+   <dt><dfn id=doctype>DOCTYPE state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype0">DOCTYPE root name before
+      state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Reprocess the current input character in the <a href="#bogus">bogus
+      comment state</a>.
+    </dl>
+
+   <dt><dfn id=doctype0>DOCTYPE root name before state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>.
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype1">DOCTYPE root name state</a>.
+    </dl>
+
+   <dt><dfn id=doctype1>DOCTYPE root name state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype2">DOCTYPE root name after state</a>.
+
+     <dt>U+003E (<code>></code>)
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>U+005B (<code>[</code>)
+
+     <dd>Switch to the <a href="#doctype5">DOCTYPE internal subset state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype2>DOCTYPE root name after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype3">DOCTYPE identifier double quoted
+      state</a>.
+
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype4">DOCTYPE identifier single quoted
+      state</a>.
+
+     <dt>U+005B (<code>[</code>)
+
+     <dd>Switch to the <a href="#doctype5">DOCTYPE internal subset state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype3>DOCTYPE identifier double quoted state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype2">DOCTYPE root name after state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>.
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype4>DOCTYPE identifier single quoted state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype2">DOCTYPE root name after state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype5>DOCTYPE internal subset state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003C (<code>&lt;</code>)
+
+     <dd>Switch to the <a href="#doctype7">DOCTYPE tag state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>U+0025 (<code>%</code>)
+
+     <dd class=issue> consume parameter entity
+
+     <dt>U+005D (<code>]</code>)
+
+     <dd>Switch to the <a href="#doctype6">DOCTYPE internal subset after
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype6>DOCTYPE internal subset after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype7>DOCTYPE tag state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0021 (<code>!</code>)
+
+     <dd>Switch to the <a href="#doctype8">DOCTYPE markup declaration
+      state</a>.
+
+     <dt>U+003F (<code>?</code>)
+
+     <dd>Switch to the <a href="#doctype41">DOCTYPE pi state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype43">DOCTYPE bogus comment state</a>.
+    </dl>
+
+   <dt><dfn id=doctype8>DOCTYPE markup declaration state</dfn>
+
+   <dd>
+    <p>If the next two characters are both U+002D (<code>-</code>)
+     characters, then consume those characters and switch to the <a
+     href="#doctype9">DOCTYPE comment state</a>.</p>
+
+    <p>Otherwise, if the next six characters are a case-sensitive match for
+     "ENTITY", then consume those characters and switch to the <a
+     href="#doctype12">DOCTYPE ENTITY state</a>.</p>
+
+    <p>Otherwise, if the next seven characters are a case-sensitive match for
+     "ATTLIST", then consume those characters and switch to the <a
+     href="#doctype24">DOCTYPE ATTLIST state</a>.</p>
+
+    <p>Otherwise, if the next eight characters are a case-sensitive match for
+     "NOTATION", then consume those characters and switch to the <a
+     href="#doctype37">DOCTYPE NOTATION state</a>.</p>
+
+    <p>Otherwise, switch to the <a href="#doctype43">DOCTYPE bogus comment
+     state</a>.</p>
+    <!-- xxx parse error somewhere here? -->
+
+   <dt><dfn id=doctype9>DOCTYPE comment state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+002D (<code>-</code>)
+
+     <dd>Switch to the <a href="#doctype10">DOCTYPE comment dash state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype10>DOCTYPE comment dash state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+002D (<code>-</code>)
+
+     <dd>Switch to the <a href="#doctype11">DOCTYPE comment end state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype9">DOCTYPE comment state</a>.
+    </dl>
+
+   <dt><dfn id=doctype11>DOCTYPE comment end state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Switch to the <a href="#doctype5">DOCTYPE internal subset state</a>.
+
+     <dt>U+002D (<code>-</code>)
+
+     <dd>Switch to the <a href="#doctype10">DOCTYPE comment dash state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype9">DOCTYPE comment state</a>.
+    </dl>
+
+   <dt><dfn id=doctype12>DOCTYPE ENTITY state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype13">DOCTYPE ENTITY type before
+      state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype43">DOCTYPE bogus comment state</a>.
+    </dl>
+
+   <dt><dfn id=doctype13>DOCTYPE ENTITY type before state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>U+0025 (<code>%</code>)
+
+     <dd>Switch to the <a href="#doctype14">DOCTYPE ENTITY parameter before
+      state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue> ...</dd>
+     <!--
+            self.currentToken = {"type":"entity", "name":data, "value":""}
+     <dd>Switch to the <span>DOCTYPE ENTITY name state</span>.</dd>
+     -->
+    </dl>
+
+   <dt><dfn id=doctype14>DOCTYPE ENTITY parameter before state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype15">DOCTYPE ENTITY parameter
+      state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype43">DOCTYPE bogus comment state</a>.
+    </dl>
+
+   <dt><dfn id=doctype15>DOCTYPE ENTITY parameter state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue> ...</dd>
+     <!--
+            self.currentToken = {"type":"parameterEntity", "name":data,
+              "value":""}
+     <dd>Switch to the <span>DOCTYPE ENTITY name state</span>.</dd>
+     -->
+    </dl>
+
+   <dt><dfn id=doctype16>DOCTYPE ENTITY name state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype17">DOCTYPE ENTITY name after
+      state</a>.
+
+     <dt>EOF</dt>
+     <!--xxx            # XXX parse error
+            self.currentToken = None -->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue> ...</dd>
+     <!--
+     <dd>Append the current input character to the tag name and stay in the current state.</dd>
+     -->
+    </dl>
+
+   <dt><dfn id=doctype17>DOCTYPE ENTITY name after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype18">DOCTYPE ENTITY value double
+      quoted state</a>.
+
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype19">DOCTYPE ENTITY value single
+      quoted state</a>.
+
+     <dt>EOF</dt>
+     <!--xxx            # XXX parse error
+            self.currentToken == None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype21">DOCTYPE ENTITY identifier
+      state</a>.
+    </dl>
+
+   <dt><dfn id=doctype18>DOCTYPE ENTITY value double quoted state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+    <!-- XXX "%" -->
+    <dl class=switch>
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype20">DOCTYPE ENTITY value after
+      state</a>.
+
+     <dt>U+0026 (<code>&amp;</code>):
+
+     <dd class=issue>... normalize numeric entities only
+
+     <dt>EOF</dt>
+     <!--xxx
+            # XXX parse error
+            self.currentToken == None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the current input character to the current entity token's
+      value.
+    </dl>
+
+   <dt><dfn id=doctype19>DOCTYPE ENTITY value single quoted state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+    <!-- "%" -->
+    <dl class=switch>
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype20">DOCTYPE ENTITY value after
+      state</a>.
+
+     <dt>U+0026 (<code>&amp;</code>):
+
+     <dd class=issue>... normalize numeric entities only
+
+     <dt>EOF</dt>
+     <!--xxx
+            # XXX parse error
+            self.currentToken == None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the current input character to the current entity token's
+      value.
+    </dl>
+
+   <dt><dfn id=doctype20>DOCTYPE ENTITY value after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>U+003E (<code>></code>)
+
+     <dd class=issue>do something with the entity token
+
+     <dt>EOF</dt>
+     <!-- xxx
+            # XXX parse error
+            self.currentToken == None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype21>DOCTYPE ENTITY identifier state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd class=issue> append entity ...
+
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype22">DOCTYPE ENTITY identifier double
+      quoted state</a>.
+
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype23">DOCTYPE ENTITY identifier single
+      quoted state</a>.
+
+     <dt>EOF</dt>
+     <!-- xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype22>DOCTYPE ENTITY identifier double quoted state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype21">DOCTYPE ENTITY identifier
+      state</a>.
+
+     <dt>EOF</dt>
+     <!--xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype23>DOCTYPE ENTITY identifier single quoted state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype21">DOCTYPE ENTITY identifier
+      state</a>.
+
+     <dt>EOF</dt>
+     <!--xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype24>DOCTYPE ATTLIST state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype25">DOCTYPE ATTLIST name before
+      state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype43">DOCTYPE bogus comment state</a>.
+    </dl>
+
+   <dt><dfn id=doctype25>DOCTYPE ATTLIST name before state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue>...</dd>
+     <!--xxx
+            self.currentToken = {"name":data, "attrs":[]}
+     <dd>Switch to the <span>DOCTYPE ATTLIST name state</span>.</dd>-->
+    </dl>
+
+   <dt><dfn id=doctype26>DOCTYPE ATTLIST name state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype27">DOCTYPE ATTLIST name after
+      state</a>.
+
+     <dt>EOF</dt>
+     <!-- xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue>...</dd>
+     <!--<dd>Append  the current input character to the tag name and stay in the current state.</dd>-->
+    </dl>
+
+   <dt><dfn id=doctype27>DOCTYPE ATTLIST name after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>U+003E (<code>></code>)</dt>
+     <!-- xxx
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#doctype5">DOCTYPE internal subset state</a>.
+
+     <dt>EOF</dt>
+     <!-- xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue>...</dd>
+     <!--    self.currentToken["attrs state</span>.</dd>.append({"name":data, "type":"",
+              "dv":""})
+     <dd>Switch to the <span>DOCTYPE ATTLIST attribute name state</span>.</dd>-->
+    </dl>
+
+   <dt><dfn id=doctype28>DOCTYPE ATTLIST attribute name state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype29">DOCTYPE ATTLIST attribute name
+      after state</a>.
+
+     <dt>EOF</dt>
+     <!-- xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue>...</dd>
+     <!--            self.currentToken["attrs state</span>.</dd>[-1]["name state</span>.</dd> += data-->
+    </dl>
+
+   <dt><dfn id=doctype29>DOCTYPE ATTLIST attribute name after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>EOF</dt>
+     <!-- xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue>...</dd>
+     <!--
+            self.currentToken["attrs state</span>.</dd>[-1]["type state</span>.</dd> += data
+     <dd>Switch to the <span>DOCTYPE ATTLIST attribute type state</span>.</dd>-->
+    </dl>
+
+   <dt><dfn id=doctype30>DOCTYPE ATTLIST attribute type state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype31">DOCTYPE ATTLIST attribute type
+      after state</a>.
+
+     <dt>EOF</dt>
+     <!-- xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue>...</dd>
+     <!--            self.currentToken["attrs state</span>.</dd>[-1]["type state</span>.</dd> += data-->
+    </dl>
+
+   <dt><dfn id=doctype31>DOCTYPE ATTLIST attribute type after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>U+0023 (<code>#</code>)
+
+     <dd>Switch to the <a href="#doctype32">DOCTYPE ATTLIST attribute
+      declaration before state</a>.
+
+     <dt>EOF</dt>
+     <!--
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype43">DOCTYPE bogus comment state</a>.
+    </dl>
+
+   <dt><dfn id=doctype32>DOCTYPE ATTLIST attribute declaration before
+    state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype43">DOCTYPE bogus comment state</a>.
+
+     <dt>EOF</dt>
+     <!--xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype33">DOCTYPE ATTLIST attribute
+      declaration state</a>.
+    </dl>
+
+   <dt><dfn id=doctype33>DOCTYPE ATTLIST attribute declaration state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype34">DOCTYPE ATTLIST attribute
+      declaration after state</a>.
+
+     <dt>EOF</dt>
+     <!--xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype34>DOCTYPE ATTLIST attribute declaration after
+    state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>U+003E (<code>></code>)
+
+     <dd>Switch to the <a href="#doctype5">DOCTYPE internal subset state</a>.
+
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype35">DOCTYPE ATTLIST attribute value
+      double quoted state</a>.
+
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype36">DOCTYPE ATTLIST attribute value
+      single quoted state</a>.
+
+     <dt>EOF</dt>
+     <!--xxx
+            # XXX parse error
+            self.currentToken = None-->
+
+     <dd>Switch to the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd class=issue> ...</dd>
+     <!--            self.currentToken["attrs state</span>.</dd>.append({"name":data, "type":"",
+              "dv":""})
+     <dd>Switch to the <span>DOCTYPE ATTLIST attribute name state</span>.</dd>-->
+    </dl>
+
+   <dt><dfn id=doctype35>DOCTYPE ATTLIST attribute value double quoted
+    state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype27">DOCTYPE ATTLIST name after
+      state</a>.</dd>
+     <!--
+     <dt>U+0025 (<code>%</code>)</dt>
+            raise NotSupportedError
+-->
+
+     <dt>U+0026 (<code>&amp;</code>):
+
+     <dd class=issue>...
+
+     <dt>Anything else
+
+     <dd class="issue="> ...</dd>
+     <!-- self.currentToken["attrs state</span>.</dd>[-1]["dv state</span>.</dd> += data-->
+    </dl>
+
+   <dt><dfn id=doctype36>DOCTYPE ATTLIST attribute value single quoted
+    state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype27">DOCTYPE ATTLIST name after
+      state</a>.</dd>
+     <!--
+     <dt>U+0025 (<code>%</code>)</dt>
+            raise NotSupportedError
+-->
+
+     <dt>U+0026 (<code>&amp;</code>):
+
+     <dd class=issue>...
+
+     <dt>Anything else
+
+     <dd class=issue> ...</dd>
+     <!--       self.currentToken["attrs state</span>.</dd>[-1]["dv state</span>.</dd> += data-->
+    </dl>
+
+   <dt><dfn id=doctype37>DOCTYPE NOTATION state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#doctype38">DOCTYPE NOTATION identifier
+      state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype43">DOCTYPE bogus comment state</a>.
+    </dl>
+
+   <dt><dfn id=doctype38>DOCTYPE NOTATION identifier state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Switch to the <a href="#doctype5">DOCTYPE internal subset state</a>.
+
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype39">DOCTYPE NOTATION identifier
+      double quoted state</a>.
+
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype40">DOCTYPE NOTATION identifier
+      single quoted state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype39>DOCTYPE NOTATION identifier double quoted
+    state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#doctype38">DOCTYPE NOTATION identifier
+      state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype40>DOCTYPE NOTATION identifier single quoted
+    state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#doctype38">DOCTYPE NOTATION identifier
+      state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype41>DOCTYPE pi state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003F (<code>?</code>)
+
+     <dd>Switch to the <a href="#doctype42">DOCTYPE pi after state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Stay in the current state.
+    </dl>
+
+   <dt><dfn id=doctype42>DOCTYPE pi after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Switch to the <a href="#doctype5">DOCTYPE internal subset state</a>.
+
+     <dt>U+003F (<code>?</code>)
+
+     <dd>Stay in the current state.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Switch to the <a href="#doctype41">DOCTYPE pi state</a>.
+    </dl>
+
+   <dt><dfn id=doctype43>DOCTYPE bogus comment state</dfn>
+
+   <dd>
+    <p>Consume every character up to the first U+003E (<code>></code>) or
+     EOF, whichever comes first. Emit a comment token whose data is the
+     concatenation of all those consumed characters. Then consume the next
+     input character and switch to the <a href="#doctype5">DOCTYPE internal
+     subset state</a> reprocessing the EOF character if that was the
+     character consumed.
+
+   <dt><dfn id=tag-name>Tag name state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#tag-attribute">tag attribute name before
+      state</a>.
+
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the current token and then switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>U+002F (<code>/</code>)
+
+     <dd>Switch to the <a href="#empty">empty tag state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the current input character to the tag name and stay in the
+      current state.
+    </dl>
+
+   <dt><dfn id=empty>Empty tag state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the current tag token as empty tag token and then switch to the
+      <a href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd><a href="#parse">Parse error</a>. Reprocess the current input
+      character in the <a href="#tag-attribute">tag attribute name before
+      state</a>.
+    </dl>
+
+   <dt><dfn id=tag-attribute>Tag attribute name before state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>uU+003E (<code>></code>)
+
+     <dd>Emit the current token and then switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>U+002F (<code>/</code>)
+
+     <dd>Switch to the <a href="#empty">Empty tag state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Start a new attribute in the current tag token. Set that attribute's
+      name to the current input character and its value to the empty string
+      and then switch to the <a href="#tag-attribute0">tag attribute name
+      state</a>.
+    </dl>
+
+   <dt><dfn id=tag-attribute0>Tag attribute name state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+003D (<code>=</code>)
+
+     <dd>Switch to the <a href="#tag-attribute2">tag attribute value before
+      state</a>.
+
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the current token as start tag token. Switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#tag-attribute1">tag attribute name after
+      state</a>.
+
+     <dt>U+002F (<code>/</code>)
+
+     <dd>Switch to the <a href="#empty">Empty tag state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token as start
+      tag token and then reprocess the current input character in the <a
+      href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the current input character to the current attribute's name.
+      Stay in the current state.
+    </dl>
+
+    <p>When the user agent leaves this state (and before emitting the tag
+     token, if appropriate), the complete attribute's name <em
+     class=ct>must</em> be compared to the other attributes on the same
+     token; if there is already an attribute on the token with the exact same
+     name, then this is a parse error and the new attribute <em
+     class=ct>must</em> be dropped, along with the value that gets associated
+     with it (if any).</p>
+
+   <dt><dfn id=tag-attribute1>Tag attribute name after state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>U+003D (<code>=</code>)
+
+     <dd>Switch to the <a href="#tag-attribute2">tag attribute value before
+      state</a>.
+
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the current token and then switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>U+002F (<code>/</code>)
+
+     <dd>Switch to the <a href="#empty">empty tag state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Start a new attribute in the current tag token. Set that attribute's
+      name to the current input character and its value to the empty string
+      and then switch to the <a href="#tag-attribute0">tag attribute name
+      state</a>.
+    </dl>
+
+   <dt><dfn id=tag-attribute2>Tag attribute value before state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Stay in the current state.
+
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#tag-attribute3">tag attribute value double
+      quoted state</a>.
+
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <a href="#tag-attribute4">tag attribute value single
+      quoted state</a>.
+
+     <dt>U+0026 (<code>&amp;</code>):
+
+     <dd>Reprocess the input character in the <a href="#tag-attribute5">tag
+      attribute value unquoted state</a>.
+
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the current token and then switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the current input character to the current attribute's value
+      and then switch to the <a href="#tag-attribute5">tag attribute value
+      unquoted state</a>.
+    </dl>
+
+   <dt><dfn id=tag-attribute3>Tag attribute value double quoted state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0022 (<code>"</code>)
+
+     <dd>Switch to the <a href="#tag-attribute">tag attribute name before
+      state</a>.
+
+     <dt>U+0026 (<code>&amp;</code>)
+
+     <dd class=issue>...
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the input character to the current attribute's value. Stay in
+      the current state.
+    </dl>
+
+   <dt><dfn id=tag-attribute4>Tag attribute value single quoted state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0027 (<code>'</code>)
+
+     <dd>Switch to the <span>beforeattribute name state</span>.
+
+     <dt>U+0026 (<code>&amp;</code>)
+
+     <dd class=issue>...
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token and then
+      reprocess the current input character in the <a href="#data-state">data
+      state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the input character to the current attribute's value. Stay in
+      the current state.
+    </dl>
+
+   <dt><dfn id=tag-attribute5>Tag attribute value unquoted state</dfn>
+
+   <dd>
+    <p>Consume the <span>next input character</span>:</p>
+
+    <dl class=switch>
+     <dt>U+0009
+
+     <dt>U+000A
+
+     <dt>U+0020
+
+     <dd>Switch to the <a href="#tag-attribute">tag attribute name before
+      state</a>.
+
+     <dt>U+0026 (<code>&amp;</code>):
+
+     <dd class=issue>...
+
+     <dt>U+003E (<code>></code>)
+
+     <dd>Emit the current token as start tag token and then switch to the <a
+      href="#data-state">data state</a>.
+
+     <dt>EOF
+
+     <dd><a href="#parse">Parse error</a>. Emit the current token as start
+      tag token and then reprocess the current input character in the <a
+      href="#data-state">data state</a>.
+
+     <dt>Anything else
+
+     <dd>Append the input character to the current attribute's value. Stay in
+      the current state.
+    </dl>
+
+   <dt><dfn id=bogus>Bogus comment state</dfn>
+
+   <dd>
+    <p>Consume every character up to the first U+003E (<code>></code>) or
+     EOF, whichever comes first. Emit a comment token whose data is the
+     concatenation of all those consumed characters. Then consume the next
+     input character and switch to the <a href="#data-state">data state</a>
+     reprocessing the EOF character if that was the character consumed.
+  </dl>
+
+  <h3 id=the-tree><span class=secno>2.4. </span>The tree construction stage</h3>
+
+  <p>The input to the tree construction stage is a sequence of tokens from
+   the <span>tokenization</span> stage. The output of this stage is a tree
+   model represented by a <code>Document</code> object.
+
+  <p>The tree construction stage passes through several phases. The initial
+   phase is <span>the start phase</span>.
+
+  <p>The <dfn id=stack>stack of open elements</dfn> contains all elements of
+   which the closing tag has not yet been encountered. Once the first start
+   tag token in <span>the start phase</span> is encountered it will contain
+   one open element. The rest of the elements are added during <span>the main
+   phase</span>.
+
+  <p>The <dfn id=current>current element</dfn> is the bottommost node in this
+   stack.
+
+  <p>The <a href="#stack">stack of open elements</a> is said to <dfn
+   id=have-an>have an element in scope</dfn> if the target element is in the
+   stack of open elements.
+
+  <p>When the steps below require the user agent to <dfn id=append>append a
+   character</dfn> to a node, the user agent <em class=ct>must</em> collect
+   it and all subsequent consecutive characters that would be appended to
+   that node and insert one <code>Text</code> node whose data is the
+   concatenation of all those characters.
+
+  <p class=issue>Need to define <dfn id=create>create an element for the
+   token</dfn>...</p>
+  <!-- namespaces and such -->
+
+  <p>When the steps below require the user agent to <dfn id=insert>insert an
+   element</dfn> for a token the user agent <em class=ct>must</em> <a
+   href="#create">create an element for the token</a> and then append it to
+   the <a href="#current">current element</a> and push it into the <a
+   href="#stack">stack of open elements</a> so that it becomes the new <a
+   href="#current">current element</a>.
+
+  <h4 id=the-start><span class=secno>2.4.1. </span>The start phase</h4>
+
+  <p>Each token emitted from the tokenization stage <em class=ct>must</em> be
+   processed as follows until the algorithm below switches to a different
+   phase:
+
+  <dl class=switch>
+   <dt>A start tag token
+
+   <dd>
+    <p><a href="#create">Create an element for the token</a> and then append
+     it to the <code>Document</code> node and push it into the <a
+     href="#stack">stack of open elements</a>. This element is the root
+     element and the first <a href="#current">current element</a>. Then
+     switch to <span>the main phase</span>.
+
+   <dt>An empty tag token
+
+   <dd>
+    <p><a href="#create">Create an element for the token</a> and append it to
+     the <code>Document</code> node. Then switch to <span>the end
+     phase</span>.
+
+   <dt>A comment token
+
+   <dd>
+    <p>Append a <code>Comment</code> node to the <code>Document</code> node
+     with the <code>data</code> attribute set to the data given in the token.
+
+   <dt>A processing instruction token
+
+   <dd>
+    <p>Append a <code>ProcessingInstruction</code> node to the
+     <code>Document</code> node with the <code>target</code> and
+     <code>data</code> atributes set to the target and data given in the
+     token.
+
+   <dt>An end-of-file token
+
+   <dd>
+    <p><a href="#parse">Parse error</a>. Reprocess the token in <span>the end
+     phase</span>.
+
+   <dt>Anything else
+
+   <dd>
+    <p><a href="#parse">Parse error</a>. Ignore the token.
+  </dl>
+
+  <h4 id=the-main><span class=secno>2.4.2. </span>The main phase</h4>
+
+  <p>Once a start tag token has been encountered (as detailed in the previous
+   phase) each token <em class=ct>must</em> be process using the following
+   steps until further notice:
+
+  <dl class=switch>
+   <dt>A character token
+
+   <dd>
+    <p><a href="#append">Append a character</a> to the <a
+     href="#current">current element</a>.
+
+   <dt>A start tag token
+
+   <dd>
+    <p><a href="#insert">Insert an element</a> for the token.
+
+   <dt>An empty tag token
+
+   <dd>
+    <p><a href="#create">Create an element for the token</a> and append it to
+     the <a href="#current">current element</a>.
+
+   <dt>An end tag token
+
+   <dd>
+    <p>If the tag name of the <span>current node</span> does not match the
+     tag name of the end tag token this is a <a href="#parse">parse
+     error</a>.</p>
+
+    <p>If there is an <span>element in scope</span> with the same tag name as
+     that of the token pop nodes from the <a href="#stack">stack of open
+     elements</a> until the first such element has been popped from the
+     stack.</p>
+
+    <p>If there are no more elements on the stack of open elements at this
+     point switch to <span>the end phase</span>.</p>
+
+   <dt>A short end tag token
+
+   <dd>
+    <p>Pop an element from the <a href="#stack">stack of open elements</a>.
+     If there are no more elements on the stack of open elements switch to
+     <span>the end phase</span>.
+
+   <dt>A comment token
+
+   <dd>
+    <p>Append a <code>Comment</code> node to the <a href="#current">current
+     element</a> with the <code>data</code> attribute set to the data given
+     in the token.
+
+   <dt>A processing instruction token
+
+   <dd>
+    <p>Append a <code>ProcessingInstruction</code> node to the <a
+     href="#current">current element</a> with the <code>target</code> and
+     <code>data</code> atributes set to the target and data given in the
+     token.
+
+   <dt>An end-of-file token
+
+   <dd>
+    <p><a href="#parse">Parse error</a>. Reprocess the token in <span>the end
+     phase</span>.
+  </dl>
+
+  <h4 id=the-end><span class=secno>2.4.3. </span>The end phase</h4>
+
+  <p>Tokens in the end phase <em class=ct>must</em> be handled as follows:
+
+  <dl class=switch>
+   <dt>A comment token
+
+   <dd>
+    <p>Append a <code>Comment</code> node to the <code>Document</code> node
+     with the <code>data</code> attribute set to the data given in the token.
+
+   <dt>A processing instruction token
+
+   <dd>
+    <p>Append a <code>ProcessingInstruction</code> node to the
+     <code>Document</code> node with the <code>target</code> and
+     <code>data</code> atributes set to the target and data given in the
+     token.
+
+   <dt>An end-of-file token
+
+   <dd>
+    <p><a href="#stops">Stop parsing</a>.
+
+   <dt>Anything else
+
+   <dd>
+    <p><a href="#parse">Parse error</a>. Ignore the token.
+  </dl>
+
+  <p>Once the user agent <dfn id=stops title="stop parsing">stops
+   parsing</dfn> the document, it <em class=ct>must</em> follow these steps:
+
+  <ol class=issue>
+   <li>...
+  </ol>
