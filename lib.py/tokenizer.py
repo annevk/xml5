@@ -143,7 +143,7 @@ class XMLTokenizer(object):
         # Discard the ; if present. Otherwise, put it back on the queue and
         # invoke parseError on parser.
         c = stream.char()
-        if c != u";":
+        if c != ";":
             # XXX parse error
             stream.queue.append(c)
         return char
@@ -282,7 +282,7 @@ class XMLTokenizer(object):
 
     def dataState(self):
         data = self.stream.char()
-        if data == u"&":
+        if data == "&":
             entity = self.consumeEntity(self.stream)
             if entity[0] == "Stream":
                 self.stream.queue.extend(entity[1])
@@ -291,23 +291,23 @@ class XMLTokenizer(object):
                   "data":entity[1]})
             else:
                 assert 0
-        elif data == u"<":
+        elif data == "<":
             self.state = self.states["tag"]
         elif data == EOF:
             # Tokenization ends.
             return False
         else:
             self.tokenQueue.append({"type":"Characters",
-              "data":data + self.stream.charsUntil((u"&", u"<"))})
+              "data":data + self.stream.charsUntil(("&", "<"))})
         return True
 
     def tagState(self):
         data = self.stream.char()
-        if data == u"/":
+        if data == "/":
             self.state = self.states["endTag"]
         elif data == "?":
             self.state = self.states["pi"]
-        elif data == u"!":
+        elif data == "!":
             self.state = self.states["markupDeclaration"]
         elif data in spaceCharacters\
           or data == "<"\
@@ -453,27 +453,27 @@ class XMLTokenizer(object):
     # Handling of comments. They end after a literal '-->' sequence.
     def commentState(self):
         data = self.stream.char()
-        if data == u"-":
+        if data == "-":
             self.state = self.states["commentDash"]
         elif data == EOF:
             # XXX parse error
             self.tokenQueue.append(self.currentToken)
             self.state = self.states["data"]
         else:
-            self.currentToken["data"] += data + self.stream.charsUntil(u"-")
+            self.currentToken["data"] += data + self.stream.charsUntil("-")
         return True
 
     def commentDashState(self):
         data = self.stream.char()
-        if data == u"-":
+        if data == "-":
             self.state = self.states["commentEnd"]
         elif data == EOF:
             # XXX parse error
             self.tokenQueue.append(self.currentToken)
             self.state = self.states["data"]
         else:
-            self.currentToken["data"] += u"-" + data +\
-              self.stream.charsUntil(u"-")
+            self.currentToken["data"] += "-" + data +\
+              self.stream.charsUntil("-")
             # Consume the next character which is either a "-" or an EOF as
             # well so if there's a "-" directly after the "-" we go nicely to
             # the "comment end state" without emitting a ParseError() there.
@@ -492,7 +492,7 @@ class XMLTokenizer(object):
             self.tokenQueue.append(self.currentToken)
             self.state = self.states["data"]
         else:
-            self.currentToken["data"] += u"--" + data
+            self.currentToken["data"] += "--" + data
             self.state = self.states["comment"]
         return True
 
@@ -556,6 +556,8 @@ class XMLTokenizer(object):
         data = self.stream.char()
         if data in spaceCharacters:
             pass
+        elif data == ">":
+            self.state = self.states["data"]
         elif data == EOF:
             # XXX parse error?
             self.state = self.states["data"]
@@ -1163,9 +1165,9 @@ class XMLTokenizer(object):
         data = self.stream.char()
         if data in spaceCharacters:
             self.stream.charsUntil(spaceCharacters, True)
-        elif data == u">":
+        elif data == ">":
             self.emitCurrentToken()
-        elif data == u"/":
+        elif data == "/":
             self.state = self.states["emptyTag"]
         elif data == EOF:
             # XXX parse error
@@ -1203,7 +1205,7 @@ class XMLTokenizer(object):
                 if self.currentToken["attributes"][-1][0] == name:
                     # XXX parse error
                     pass
-            if data == u">":
+            if data == ">":
                 self.emitCurrentToken()
         return True
 
