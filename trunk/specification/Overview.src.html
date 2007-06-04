@@ -1,8 +1,8 @@
-<!doctype html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html lang="en">
  <head>
   <title>XML5</title>
-  <style>
+  <style type="text/css">
    pre.idl { border:solid thin; background:#eee; color:#000; padding:0.5em }
    pre.idl :link, pre.idl :visited { color:inherit; background:transparent }
    pre code { color:inherit; background:transparent }
@@ -19,7 +19,7 @@
    dl.switch dt { text-indent: -1.5em; }
    dl.switch dt:before { content: '\21AA'; padding: 0 0.5em 0 0; display: inline-block; width: 1em; text-align: right; line-height: 0.5em; }
   </style>
-  <link href="http://www.w3.org/StyleSheets/TR/base" rel=stylesheet>
+  <link rel="stylesheet" href="http://www.w3.org/StyleSheets/TR/base">
  </head>
  <body>
   <h1>XML5</h1>
@@ -474,6 +474,9 @@
      <dt>U+0020</dt>
      <dd>Stay in the current state.</dd>
 
+     <dt>U+003E (<code>></code>)</dt>
+     <dd>Switch to the <span>data state</span>.</dd>
+
      <dt>EOF</dt>
      <dd><span>Parse error</span>.
      <dd>Switch to the <span>data state</span>.</dd>
@@ -545,8 +548,8 @@
      <dd>Switch to the <span>DOCTYPE root name after state</span>.</dd>
 
      <dt>EOF</dt>
-     <dd><span>Parse error</span>.
-     <dd>Switch to the <span>data state</span>.</dd>
+     <dd><span>Parse error</span>. Reprocess the current input character in the
+     <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
      <dd>Stay in the current state.</dd>
