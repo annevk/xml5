@@ -37,12 +37,100 @@ class TreeBuilder(object):
         self.openElements = []
         self.document = self.documentClass()
 
+    def findDefaultNamespaceInAttributes(self, attributes):
+        for name,value in attributes:
+            if name == "xmlns":
+                return value
+        return None
+
+    def findDefaultNamespaceInAttributeTokens(self, attributes):
+        for token in attributes:
+            if token["name"] == "xmlns":
+                return token["value"]
+        return None
+
+    def findNamespaceInAttributes(self, attributes, prefix):
+        for name,value in attributes:
+            if name == "".join(["xmlns:",prefix]):
+                return value
+        return None
+
+    def findNamespaceInAttributeTokens(self, attributes, prefix):
+        if attributes:
+            for token in attributes:
+                if token["name"] == "".join(["xmlns:",prefix]):
+                    return token["value"]
+        return None
+
+    def findDefaultNamespace(self):
+        tempNamespace = None
+        for node in self.openElements[::-1]:
+            if node.attributes:
+                tempNamespace = self.findDefaultNamespaceInAttributeTokens(node.attributes)
+                if tempNamespace:
+                    return tempNamespace
+        return ""
+
+    def findNamespace(self, prefix):
+        tempNamespace = None
+        for node in self.openElements[::-1]:
+            if node.attributes:
+                tempNamespace = self.findNamespaceInAttributeTokens(node.attributes, prefix)
+            if tempNamespace:
+                return tempNamespace
+        return ""
+    
+    def findElementNamespace(self, prefix, attributes):
+        namespace = None
+        if prefix == "":
+            if attributes:
+                namespace = self.findDefaultNamespaceInAttributes(attributes)
+            if not namespace:
+                namespace = self.findDefaultNamespace()
+        else:
+            if attributes:
+                namespace = self.findNamespaceInAttributes(attributes, prefix)
+            if not namespace:
+                namespace = self.findNamespace(prefix)
+        return namespace
+
+    def createAttributeList(self, attributes):
+        newAttributeList = []
+        for name,value in attributes:
+            prefix, localname, tempNamespace = ("", name, None)
+            if name.find(":") != -1:
+                prefix, localname = name.split(":", 1)
+            token = {"name":name, "localname":localname, "prefix":prefix, "namespace":"", "value":value}
+            if name == "xmlns" or prefix == "xmlns":
+                token["namespace"] = "http://www.w3.org/2000/xmlns/"
+            elif prefix == "xml":
+                token["namespace"] = "http://www.w3.org/XML/1998/namespace"
+            elif prefix != "":
+                if attributes:
+                    tempNamespace = self.findNamespaceInAttributes(attributes, prefix)
+                if not tempNamespace:
+                    tempNamespace = self.findNamespace(prefix)
+                token["namespace"] = tempNamespace
+            newAttributeList.append(token)
+        return newAttributeList
+
+    def createElement(self, name, attributes):
+        prefix = ""
+        localname = name
+        if name.find(":") != -1:
+            prefix, localname = name.split(":", 1)
+        namespace = self.findElementNamespace(prefix, attributes)
+        if attributes:
+            attributes = self.createAttributeList(attributes)
+        return self.elementClass(name, prefix, localname, namespace, attributes)
+
     def elementInScope(self, target):
         if self.openElements[-1].name == target:
             return True
 
         # AT Use reverse instead of [::-1] when we can rely on Python 2.4
-        for node in self.openElements[::-1][:1]:
+        for node in self.openElements[::-1][1:]:
+            print node.name
             if node.name == target:
                 return True
         return False

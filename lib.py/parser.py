@@ -1,6 +1,7 @@
 from tokenizer import XMLTokenizer
 
 import treebuilders
+from constants import spaceCharacters
 from treebuilders import simpletree
 
 class XMLParser(object):
@@ -29,22 +30,28 @@ class XMLParser(object):
         self._parse(stream, encoding=encoding)
         return self.tree.getDocument()
 
+    def containsWhiteSpace(self, string):
+        for c in string:
+            if c not in spaceCharacters:
+                return False
+        return True
+
     def startPhase(self, token):
         if token["type"] == "StartTag":
-            element = self.tree.elementClass(token["name"])
-            element.attributes = dict(token["attributes"])
+            element = self.tree.createElement(token["name"], token["attributes"])
             self.tree.document.appendChild(element)
             self.tree.openElements.append(element)
             self.phase = self.phases["main"]
         elif token["type"] == "EmptyTag":
-            element = self.tree.elementClass(token["name"])
-            element.attributes = dict(token["attributes"])
+            element = self.tree.createElement(token["name"], token["attributes"])
             self.tree.document.appendChild(element)
             self.phase = self.phases["end"]
         elif token["type"] == "Comment":
             self.tree.document.appendChild(self.tree.commentClass(token["data"]))
         elif token["type"] == "Pi":
             self.tree.document.appendChild(self.tree.piClass(token["name"], token["data"]))
+        elif token["type"] == "Characters" and self.containsWhiteSpace(token["data"]):
+            pass
         else:
             # XXX parse error
             pass
@@ -53,13 +60,11 @@ class XMLParser(object):
         if token["type"] == "Characters":
             self.tree.insertText(token["data"])
         elif token["type"] == "StartTag":
-            element = self.tree.elementClass(token["name"])
-            element.attributes = dict(token["attributes"])
+            element = self.tree.createElement(token["name"], token["attributes"])
             self.tree.openElements[-1].appendChild(element)
             self.tree.openElements.append(element)
         elif token["type"] == "EmptyTag":
-            element = self.tree.elementClass(token["name"])
-            element.attributes = dict(token["attributes"])
+            element = self.tree.createElement(token["name"], token["attributes"])
             self.tree.openElements[-1].appendChild(element)
         elif token["type"] == "EndTag":
             if self.tree.openElements[-1].name != token["name"]:
@@ -85,6 +90,8 @@ class XMLParser(object):
             self.tree.document.appendChild(self.tree.commentClass(token["data"]))
         elif token["type"] == "Pi":
             self.tree.document.appendChild(self.tree.piClass(token["name"], token["data"]))
+        elif token["type"] == "Characters" and self.containsWhiteSpace(token["data"]):
+            pass
         else:
             # XXX parse error
             pass

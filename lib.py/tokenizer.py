@@ -95,6 +95,7 @@ class XMLTokenizer(object):
           "quot":"\""
         }
         self.parameterEntities = {}
+        self.attributeNormalization = []
 
         # Tokens yet to be processed.
         self.tokenQueue = []
@@ -243,7 +244,7 @@ class XMLTokenizer(object):
             return self.parameterEntities[name]
         else:
             return ""
-    
+
     def normalizeEntityValue(self, value, loopCount):
         stream = XMLInputStream(value)
         loopCount += 1
@@ -258,10 +259,24 @@ class XMLTokenizer(object):
                 newValue += c
         return newValue
 
+    def attributeNameExists(self, name):
+        for x,y in self.currentToken["attributes"]:
+            if x == name:
+                return True
+        return False
+
     def emitCurrentToken(self):
+        if (self.currentToken["type"] == "StartTag" or
+          self.currentToken["type"] == "EmptyTag") and\
+          self.attributeNormalization:
+            for token in self.attributeNormalization:
+                if token["name"] == self.currentToken["name"]:
+                    for attr in token["attrs"]:
+                        if attr["dv"] != "" and not self.attributeNameExists(attr["name"]):
+                            self.currentToken["attributes"].append([attr["name"], attr["dv"]])
         self.tokenQueue.append(self.currentToken)
         self.state = self.states["data"]
-    
+
     def appendEntity(self):
         assert self.currentToken
         name = self.currentToken["name"]
@@ -312,11 +327,12 @@ class XMLTokenizer(object):
         elif data in spaceCharacters\
           or data == "<"\
           or data == ">"\
+          or data == ":"\
           or data == EOF:
             # XXX parse error
-            # XXX catch more "incorrect" characters here?
+            self.tokenQueue.append({"type":"Characters", "data":"<"})
             self.stream.queue.insert(0, data)
-            self.state = self.states["bogusComment"]
+            self.state = self.states["data"]
         else:
             self.currentToken = {"type":"StartTag", "name":data, "attributes":[]}
             self.state = self.states["tagName"]
@@ -329,12 +345,13 @@ class XMLTokenizer(object):
             self.state = self.states["data"]
         elif data in spaceCharacters\
           or data == "<"\
+          or data == ":"\
           or data == EOF:
             # XXX parse error
             # XXX catch more "incorrect" characters here?
-            self.stream.queue.append("/")
-            self.stream.queue.append(data)
-            self.state = self.states["bogusComment"]
+            self.tokenQueue.append({"type":"Characters", "data":"</"})
+            self.stream.queue.insert(0, data)
+            self.state = self.states["data"]
         else:
             self.currentToken = {"type":"EndTag", "name":data}
             self.state = self.states["endTagName"]
@@ -428,7 +445,6 @@ class XMLTokenizer(object):
 
     # Markup declarations.
     def markupDeclarationState(self):
-        # XXX need to have proper DOCTYPE parsing
         charStack = [self.stream.char(), self.stream.char()]
         if charStack == ["-", "-"]:
             self.currentToken = {"type":"Comment", "data":""}
@@ -903,7 +919,7 @@ class XMLTokenizer(object):
             # XXX parse error
             self.state = self.states["data"]
         else:
-            self.currentToken = {"name":data, "attrs":[]}
+            self.attributeNormalization.append({"name":data, "attrs":[]})
             self.state = self.states["doctypeAttlistName"]
         return True
 
@@ -913,10 +929,9 @@ class XMLTokenizer(object):
             self.state = self.states["doctypeAttlistNameAfter"]
         elif data == EOF:
             # XXX parse error
-            self.currentToken = None
             self.state = self.states["data"]
         else:
-            self.currentToken["name"] += data
+            self.attributeNormalization[-1]["name"] += data
         return True
 
     def doctypeAttlistNameAfterState(self):
@@ -924,15 +939,12 @@ class XMLTokenizer(object):
         if data in spaceCharacters:
             pass
         elif data == ">":
-            self.currentToken = None
             self.state = self.states["doctypeInternalSubset"]
         elif data == EOF:
             # XXX parse error
-            self.currentToken = None
             self.state = self.states["data"]
         else:
-            self.currentToken["attrs"].append({"name":data, "type":"",
-              "dv":""})
+            self.attributeNormalization[-1]["attrs"].append({"name":data, "type":"", "dv":""})
             self.state = self.states["doctypeAttlistAttrname"]
         return True
 
@@ -942,10 +954,9 @@ class XMLTokenizer(object):
             self.state = self.states["doctypeAttlistAttrnameAfter"]
         elif data == EOF:
             # XXX parse error
-            self.currentToken = None
             self.state = self.states["data"]
         else:
-            self.currentToken["attrs"][-1]["name"] += data
+            self.attributeNormalization[-1]["attrs"][-1]["name"] += data
         return True
 
     def doctypeAttlistAttrnameAfterState(self):
@@ -954,10 +965,9 @@ class XMLTokenizer(object):
             pass
         elif data == EOF:
             # XXX parse error
-            self.currentToken = None
             self.state = self.states["data"]
         else:
-            self.currentToken["attrs"][-1]["type"] += data
+            self.attributeNormalization[-1]["attrs"][-1]["type"] += data
             self.state = self.states["doctypeAttlistAttrtype"]
         return True
 
@@ -967,10 +977,9 @@ class XMLTokenizer(object):
             self.state = self.states["doctypeAttlistAttrtypeAfter"]
         elif data == EOF:
             # XXX parse error
-            self.currentToken = None
             self.state = self.states["data"]
         else:
-            self.currentToken["attrs"][-1]["type"] += data
+            self.attributeNormalization[-1]["attrs"][-1]["type"] += data
         return True
 
     def doctypeAttlistAttrtypeAfterState(self):
@@ -981,7 +990,6 @@ class XMLTokenizer(object):
             self.state = self.states["doctypeAttlistAttrdeclBefore"]
         elif data == EOF:
             # XXX parse error
-            self.currentToken = None
             self.state = self.states["data"]
         else:
             self.state = self.states["doctypeBogusComment"]
@@ -993,7 +1001,6 @@ class XMLTokenizer(object):
             self.state = self.states["doctypeBogusComment"]
         elif data == EOF:
             # XXX parse error
-            self.currentToken = None
             self.state = self.states["data"]
         else:
             self.state = self.states["doctypeAttlistAttrdecl"]
@@ -1002,10 +1009,9 @@ class XMLTokenizer(object):
     def doctypeAttlistAttrdeclState(self):
         data = self.stream.char()
         if data in spaceCharacters:
-            self.state = self.states["doctypeAttListAttrdeclAfter"]
+            self.state = self.states["doctypeAttlistAttrdeclAfter"]
         elif data == EOF:
             # XXX parse error
-            self.currentToken = None
             self.state = self.states["data"]
         else:
             pass
@@ -1023,11 +1029,9 @@ class XMLTokenizer(object):
             self.state = self.states["doctypeAttlistAttrvalSingleQuoted"]
         elif data == EOF:
             # XXX parse error
-            self.currentToken = None
             self.state = self.states["data"]
         else:
-            self.currentToken["attrs"].append({"name":data, "type":"",
-              "dv":""})
+            self.attributeNormalization[-1]["attrs"].append({"name":data, "type":"", "dv":""})
             self.state = self.states["doctypeAttlistAttrname"]
         return True
 
@@ -1040,7 +1044,7 @@ class XMLTokenizer(object):
         elif data == "&":
             raise NotSupportedError
         else:
-            self.currentToken["attrs"][-1]["dv"] += data
+            self.attributeNormalization[-1]["attrs"][-1]["dv"] += data
         return True
 
     def doctypeAttlistAttrvalSingleQuotedState(self):
@@ -1052,7 +1056,7 @@ class XMLTokenizer(object):
         elif data == "&":
             raise NotSupportedError
         else:
-            self.currentToken["attrs"][-1]["dv"] += data
+            self.attributeNormalization[-1]["attrs"][-1]["dv"] += data
         return True
 
     # <!NOTATION
@@ -1158,6 +1162,7 @@ class XMLTokenizer(object):
             self.emitCurrentToken()
         else:
             # XXX parse error
+            # reconsume?
             self.state = self.states["tagAttributeNameBefore"]
         return True
 
@@ -1169,6 +1174,9 @@ class XMLTokenizer(object):
             self.emitCurrentToken()
         elif data == "/":
             self.state = self.states["emptyTag"]
+        elif data == ":":
+            # XXX parse error
+            pass
         elif data == EOF:
             # XXX parse error
             self.emitCurrentToken()
@@ -1219,6 +1227,9 @@ class XMLTokenizer(object):
             self.emitCurrentToken()
         elif data == "/":
             self.state = self.states["emptyTag"]
+        elif data == ":":
+            # XXX parse error
+            pass
         elif data == EOF:
             # XXX parse error
             self.emitCurrentToken()
@@ -1292,12 +1303,9 @@ class XMLTokenizer(object):
               self.stream.charsUntil(frozenset(("&", ">","<")) | spaceCharacters)
         return True
 
-    # Consume everything up to > and make it a comment.
+    # Consume everything up and including > and make it a comment.
     def bogusCommentState(self):
         self.tokenQueue.append({"type": "Comment", "data": self.stream.charsUntil(">")})
-
-        # Eat the character directly after the bogus comment which is either a
-        # ">" or an EOF.
         self.stream.char()
         self.state = self.states["data"]
         return True
