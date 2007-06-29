@@ -66,8 +66,38 @@
   
   <h3>The tokenization stage</h3>
   
-  <p class="issue">...</p>
+  <p>Implementations <em class="ct">must</em> act as if they used the following
+  state machine to tokenize XML. The state machine <em class="ct">must</em>
+  start in the <span>data state</span>. Most states consume a single character,
+  which can have various side-effects, and either switches the state machine to
+  a new state to reconsume the same character, or switches it to a new state
+  (to consume the next character), or repeats the same state (to consume the
+  next character). Some states have more complicated behaviour and can consume
+  several characters before switching to another state.</p>
+
+  <p>The output of the tokenization stage is a series of zero or more of the
+  following tokens: start tag, empty tag, end tag, short end tag, comment,
+  character, processing instruction and end-of-file. Start and empty tag tokens
+  have a tag name and a list of attributes, each of which has a name and a
+  value. End tags have a tag name. Comment and character tokens have data.
+  Processing instructions have a name and data.</p>
   
+  <p>The tokenization stage also uses a <dfn>list of entities</dfn> and a
+  <dfn>list of parameter entities</dfn>. Both lists are populated with tokens
+  consisting of a name and value during the tokenization stage and are also used
+  within this stage.</p>
+  
+  <p>Whenever the steps below indicate that the user agent has to
+  <dfn id="append-entity">append an entity</dfn> an entity has to be appended to
+  the <span>list of entities</span> unless the entity flag has been set to
+  "parameter" in which case it hsa to be appended to the <span>list of parameter
+  entities</span>. The <dfn>entity flag</dfn> has two values: "normal" and
+  "parameter". Its default value is "normal". It is set to "normal" after an
+  entity has been appended.</p>
+
+  <p>The tokenization stage also has a <dfn>list of attribute declarations</dfn>
+  each consisting of a tag name and a list of attributes which consist of an
+  attribute name, type and default value.</p>
 
   <dl>
    <dt><dfn>Data state</dfn></dt>
@@ -113,16 +143,16 @@
      <dt>U+0009</dt>
      <dt>U+000A</dt>
      <dt>U+0020</dt>
-
+     <dt>U+003A (<code>:</code>)
      <dt>U+003C (<code>&lt;</code>)</dt>
      <dt>U+003E (<code>></code>)</dt>
      <dt>EOF</dt>
      
-     <dd><span>Parse error</span>. Reprocess the character in the <span>bogus
-     comment state</span>.</dd>
-     
+     <dd><span>Parse error</span>. Emit a U+003C (<code>&lt;</code>) character.
+     Reconsume the current input character in the <span>data state</span>.</dd>
+
      <dt>Anything else</dt>
-     
+
      <dd>Create a new tag token and set its name to the input character, then
      switch to the <span>tag name state</span>.</dd>
     </dl>
@@ -142,12 +172,13 @@
      <dt>U+0009</dt>
      <dt>U+000A</dt>
      <dt>U+0020</dt>
-
      <dt>U+003C (<code>&lt;</code>)</dt>
+     <dt>U+003A (<code>:</code>)</dt>
      <dt>EOF</dt>
-     
-     <dd>Unconsume the last two characters and then switch to the <span>bogus
-     comment state</span>.</dd>
+
+     <dd><span>Parse error</span>. Emit a U+003C (<code>&lt;</code>) character
+     token and a U+002F (<code>/</code>) character token. Reconsume the current
+     input character in the <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
      
@@ -307,14 +338,14 @@
     characters, consume those two characters, create a comment token whose data
     is the empty string and then switch to the <span>comment state</span>.</p>
     
-    <p>Otherwise, if the next seven characters are a case-sensitive match for
+    <p>Otherwise, if the next seven characters are an exact match for
     "[CDATA[", then consume those characters and switch to the <span>CDATA
     state</span>.</p>
     
-    <p>Otherwise, if the next seven characters are a case-sensitive match for
-    "DOCTYPE", then this is a <span>parse error</span>. Consume those characters
-    and switch to the <span>DOCTYPE state</span>.</p>
-    <!-- or should we make them legal? -->
+    <p>Otherwise, if the next seven characters are an exact match for "DOCTYPE",
+    then this is a <span>parse error</span>. Consume those characters and switch
+    to the <span>DOCTYPE state</span>.</p>
+    <!-- XXX make them legal? -->
 
     <p>Otherwise, this is a <span>parse error</span>. Switch to the <span>bogus
     comment state</span>.</p>
@@ -643,18 +674,18 @@
     then consume those characters and switch to the <span>DOCTYPE comment
     state</span>.</p>
 
-    <p>Otherwise, if the next six characters are a case-sensitive match for
-    "ENTITY", then consume those characters and switch to the
-    <span>DOCTYPE ENTITY state</span>.</p>
+    <p>Otherwise, if the next six characters are an exact match for "ENTITY",
+    then consume those characters and switch to the <span>DOCTYPE ENTITY
+    state</span>.</p>
     
-    <p>Otherwise, if the next seven characters are a case-sensitive match for
-    "ATTLIST", then consume those characters and switch to the <span>DOCTYPE
-    ATTLIST state</span>.</p>
+    <p>Otherwise, if the next seven characters are an exact match for "ATTLIST",
+    then consume those characters and switch to the <span>DOCTYPE ATTLIST
+    state</span>.</p>
     
-    <p>Otherwise, if the next eight characters are a case-sensitive match for
+    <p>Otherwise, if the next eight characters are an exact match for
     "NOTATION", then consume those characters and switch to the <span>DOCTYPE
     NOTATION state</span>.</p>
-    
+
     <p>Otherwise, switch to the <span>DOCTYPE bogus comment state</span>.</p>
     <!-- xxx parse error somewhere here? -->
    </dd>
@@ -691,7 +722,6 @@
      <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
-
      <dd>Switch to the <span>DOCTYPE comment state</span>.</dd>
     </dl>
    </dd>
@@ -755,11 +785,9 @@
      <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
-     <dd class="issue"> ... </dd>
-     <!--
-            self.currentToken = {"type":"entity", "name":data, "value":""}
-     <dd>Switch to the <span>DOCTYPE ENTITY name state</span>.</dd>
-     -->
+     <dd>Create an entity token with the name set to the current input character
+     and the value set to the empty string. Then switch to the <span>DOCTYPE
+     ENTITY name state</span>.</dd>
     </dl>
    </dd>
 
@@ -797,12 +825,9 @@
      <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
-     <dd class="issue"> ... </dd>
-     <!--
-            self.currentToken = {"type":"parameterEntity", "name":data,
-              "value":""}
-     <dd>Switch to the <span>DOCTYPE ENTITY name state</span>.</dd>
-     -->
+     <dd>Create an entity token with the name set to the current input character
+     and the value set to the empty string. Set the <span>entity flag</span> to
+     "parameter". Switch to the <span>DOCTYPE ENTITY name state</span>.</dd>
     </dl>
    </dd>
 
@@ -817,15 +842,11 @@
      <dd>Switch to the <span>DOCTYPE ENTITY name after state</span>.</dd>
 
      <dt>EOF</dt>
-<!--xxx            # XXX parse error
-            self.currentToken = None -->
-     <dd>Switch to the <span>data state</span>.</dd>
+     <dd><span>Parse error</span>. Reconsume the current input character in the
+     <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
-     <dd class="issue"> ... </dd>
-     <!--
-     <dd>Append the current input character to the tag name and stay in the current state.</dd>
-     -->
+     <dd>Append the current input character to the name of the entity.</dd>
     </dl>
    </dd>
 
@@ -846,12 +867,10 @@
      <dd>Switch to the <span>DOCTYPE ENTITY value single quoted state</span>.</dd>
 
      <dt>EOF</dt>
-<!--xxx            # XXX parse error
-            self.currentToken == None-->
-     <dd>Switch to the <span>data state</span>.</dd>
+     <dd><span>Parse error</span>. Reconsume the current input character in the
+     <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
-
      <dd>Switch to the <span>DOCTYPE ENTITY identifier state</span>.</dd>
     </dl>
    </dd>
@@ -869,10 +888,9 @@
      <dt>U+0026 (<code>&amp;</code>):
      <dd class="issue">... normalize numeric entities only</dd>
 
-     <dt>EOF</dt><!--xxx
-            # XXX parse error
-            self.currentToken == None-->
-     <dd>Switch to the <span>data state</span>.</dd>
+     <dt>EOF</dt>
+     <dd><span>Parse error</span>. Reconsume the current input character in the
+     <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
      <dd>Append the current input character to the current entity token's
@@ -915,12 +933,12 @@
      <dd>Stay in the current state.</dd>
 
      <dt>U+003E (<code>></code>)</dt>
-     <dd class="issue">do something with the entity token</dd>
+     <dd><span>Append an entity</span>. Switch to the <span>DOCTYPE internal
+     subset state</span>.</dd>
 
-     <dt>EOF</dt><!-- xxx
-            # XXX parse error
-            self.currentToken == None-->
-     <dd>Switch to the <span>data state</span>.</dd>
+     <dt>EOF</dt>
+     <dd><span>Parse error</span>. Reconsume the current input character in the
+     <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
      <dd>Stay in the current state.</dd>
@@ -942,10 +960,9 @@
      <dt>U+0027 (<code>'</code>)</dt>
      <dd>Switch to the <span>DOCTYPE ENTITY identifier single quoted state</span>.</dd>
 
-     <dt>EOF</dt><!-- xxx
-            # XXX parse error
-            self.currentToken = None-->
-     <dd>Switch to the <span>data state</span>.</dd>
+     <dt>EOF</dt>
+     <dd><span>Parse error</span>. Reconsume the current input character in the
+     <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
      <dd>Stay in the current state.</dd>
@@ -961,10 +978,9 @@
      <dt>U+0022 (<code>"</code>)</dt>
      <dd>Switch to the <span>DOCTYPE ENTITY identifier state</span>.</dd>
 
-     <dt>EOF</dt><!--xxx
-            # XXX parse error
-            self.currentToken = None-->
-     <dd>Switch to the <span>data state</span>.</dd>
+     <dt>EOF</dt>
+     <dd><span>Parse error</span>. Reconsume the current input character in the
+     <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
      <dd>Stay in the current state.</dd>
@@ -980,10 +996,9 @@
      <dt>U+0027 (<code>'</code>)</dt>
      <dd>Switch to the <span>DOCTYPE ENTITY identifier state</span>.</dd>
 
-     <dt>EOF</dt><!--xxx
-            # XXX parse error
-            self.currentToken = None-->
-     <dd>Switch to the <span>data state</span>.</dd>
+     <dt>EOF</dt>
+     <dd><span>Parse error</span>. Reconsume the current input character in the
+     <span>data state</span>.</dd>
 
      <dt>Anything else</dt>
      <dd>Stay in the current state.</dd>
@@ -1468,6 +1483,9 @@
      <dt>U+002F (<code>/</code>)</dt>
      <dd>Switch to the <span>Empty tag state</span>.</dd>
 
+     <dt>U+003A (<code>:</code>)</dt>
+     <dd><span>Parse error</span>. Stay in the current state.</dd>
+     
      <dt>EOF</dt>
      <dd><span>Parse error</span>. Emit the current token and then reprocess the
      current input character in the <span>data state</span>.</dd>

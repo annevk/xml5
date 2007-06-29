@@ -61,7 +61,7 @@ class Document(Node):
     def printTree(self):
         tree = unicode(self)
         for child in self.childNodes:
-            tree += child.printTree(2)
+            tree += child.printTree(1)
         return tree
 
 class Text(Node):
@@ -78,47 +78,23 @@ class Text(Node):
     hilite = toxml
 
 class Element(Node):
-    def __init__(self, name):
+    def __init__(self, name, prefix, localname, namespace, attributes):
         Node.__init__(self)
         self.name = name
-        self.attributes = {}
+        self.prefix = prefix
+        self.localname = localname
+        self.namespace = namespace
+        self.attributes = attributes
 
     def __unicode__(self):
         return "<%s>" % self.name
 
-    def toxml(self):
-        result = '<' + self.name
-        if self.attributes:
-            for name,value in self.attributes.iteritems():
-                result += ' %s="%s"' % (name, escape(value,{'"':'&quot;'}))
-        if self.childNodes:
-            result += '>'
-            for child in self.childNodes:
-                result += child.toxml()
-            result += '</%s>' % self.name
-        else:
-            result += '/>'
-        return result
-    
-    def hilite(self):
-        result = '&lt;<code class="markup element-name">%s</code>' % self.name
-        if self.attributes:
-            for name, value in self.attributes.iteritems():
-                result += ' <code class="markup attribute-name">%s</code>=<code class="markup attribute-value">"%s"</code>' % (name, escape(value, {'"':'&quot;'}))
-        if self.childNodes:
-            result += ">"
-            for child in self.childNodes:
-                result += child.hilite()
-        else:
-            return result + "/>"
-        return result + '&lt;/<code class="markup element-name">%s</code>>' % self.name
-
     def printTree(self, indent):
-        tree = '\n|%s%s' % (' '*indent, unicode(self))
+        tree = '\n|%s<%s> (%s, %s, %s)' % (' '*indent, self.name, self.prefix, self.localname, self.namespace)
         indent += 2
         if self.attributes:
-            for name, value in self.attributes.iteritems():
-                tree += '\n|%s%s="%s"' % (' ' * indent, name, value)
+            for token in self.attributes:
+                tree += '\n|%s%s="%s" (%s, %s, %s)' % (' ' * indent, token["name"], token["value"], token["prefix"], token["localname"], token["namespace"])
         for child in self.childNodes:
             tree += child.printTree(indent)
         return tree
