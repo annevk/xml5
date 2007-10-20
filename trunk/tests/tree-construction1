@@ -40,14 +40,6 @@ Bogus comment
 | <x> (, x, )
 
 #data
-<!DOCTYPE y [<!ENTITY t "&#38;#38; &#38;#38;#38; &amp;amp;">]><x id="&t;">&t;</x>
-#errors
-#document
-| <x> (, x, )
-|   id="& &#38; &amp;" (, id, )
-|   "& &#38; &amp;"
-
-#data
 <!DOCTYPE y [<!ENTITY % b '&#37;c;'><!ENTITY % c '&#60;!ENTITY a "x" >'>%b;]><y>&a;</y>
 #errors
 #document

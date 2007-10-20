@@ -1,6 +1,5 @@
 from parser import XMLParser
-def runtests():
-    filename = "../tests/tree-construction1"
+def runtests(filename):
     f = open(filename)
     tests = f.read().split("#data\n")
     errorAmount = index = 0
@@ -45,4 +44,8 @@ def parseTestcase(testString):
     return "\n".join(input), "\n".join(expected), errors
 
 if __name__ == "__main__":
-    runtests()
+    import sys
+    runtests("../tests/tree-construction1")
+    if sys.argv[-1] == "testrunner.py":
+        print "Run tests that need fixing..."
+        runtests("../tests/needs-fixing")
