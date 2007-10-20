@@ -23,7 +23,7 @@
 <xml:foobar/>
 #errors
 #document
-| <xml:foobar> (xml, foobar, )
+| <xml:foobar> (xml, foobar, http://www.w3.org/XML/1998/namespace)
 
 #data
 <!doctype html><x></>
@@ -40,17 +40,19 @@ Bogus comment
 | <x> (, x, )
 
 #data
-<!DOCTYPE y [
- <!ELEMENT test (#PCDATA) >
- <!ENTITY % xx '&#37;zz;'>
- <!ENTITY % zz '&#60;!ENTITY x "foo" >' >
- %xx;
-]>
-<y>&x;</>
+<!DOCTYPE y [<!ENTITY t "&#38;#38; &#38;#38;#38; &amp;amp;">]><x id="&t;">&t;</x>
+#errors
+#document
+| <x> (, x, )
+|   id="& &#38; &amp;" (, id, )
+|   "& &#38; &amp;"
+
+#data
+<!DOCTYPE y [<!ENTITY % b '&#37;c;'><!ENTITY % c '&#60;!ENTITY a "x" >'>%b;]><y>&a;</y>
 #errors
 #document
 | <y> (, y, )
-|   "foo"
+|   "x"
 
 #data
 <!DOCTYPE x [
@@ -141,3 +143,49 @@ Bogus comment
 #errors
 #document
 | <!-- - -->
+
+#data
+<a/>x
+#errors
+#document
+| <a> (, a, )
+
+#data
+<a//>x
+#errors
+#document
+| <a> (, a, )
+
+#data
+<a///>x
+#errors
+#document
+| <a> (, a, )
+
+#data
+<a////>x
+#errors
+#document
+| <a> (, a, )
+
+#data
+<x>&xx<test>
+#errors
+#document
+| <x> (, x, )
+|   "&xx<test>"
+
+#data
+<x>&xx<test>;<x>
+#errors
+#document
+| <x> (, x, )
+|   "&xx<test>;"
+|   <x> (, x, )
+
+#data
+<x>&lt;&lt;</x>
+#errors
+#document
+| <x> (, x, )
+|   "<<"

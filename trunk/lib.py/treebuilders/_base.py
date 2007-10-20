@@ -76,8 +76,8 @@ class TreeBuilder(object):
         for node in self.openElements[::-1]:
             if node.attributes:
                 tempNamespace = self.findNamespaceInAttributeTokens(node.attributes, prefix)
-            if tempNamespace:
-                return tempNamespace
+                if tempNamespace:
+                    return tempNamespace
         return ""
     
     def findElementNamespace(self, prefix, attributes):
@@ -119,7 +119,12 @@ class TreeBuilder(object):
         localname = name
         if name.find(":") != -1:
             prefix, localname = name.split(":", 1)
-        namespace = self.findElementNamespace(prefix, attributes)
+        if prefix == "xmlns":
+            namespace = "http://www.w3.org/2000/xmlns/"
+        elif prefix == "xml":
+            namespace = "http://www.w3.org/XML/1998/namespace"
+        else:
+            namespace = self.findElementNamespace(prefix, attributes)
         if attributes:
             attributes = self.createAttributeList(attributes)
         return self.elementClass(name, prefix, localname, namespace, attributes)
@@ -130,7 +135,6 @@ class TreeBuilder(object):
 
         # AT Use reverse instead of [::-1] when we can rely on Python 2.4
         for node in self.openElements[::-1][1:]:
-            print node.name
             if node.name == target:
                 return True
         return False

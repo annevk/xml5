@@ -1,0 +1,5 @@
+#data
+<!DOCTYPE y [<!ENTITY % a '&#37;b;'><!ENTITY % b '&#37;a;'>%a;]><y/>
+#errors
+#document
+| <y> (, y, )

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import _base
 from xml.sax.saxutils import escape
 

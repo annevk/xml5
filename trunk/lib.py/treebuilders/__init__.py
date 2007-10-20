@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """A collection of modules for building different kinds of tree from XML
 documents.
 

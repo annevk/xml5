@@ -88,7 +88,7 @@ class XMLTokenizer(object):
 
         # Entities
         self.entities = {
-          "lt":"&#60;",
+          "lt":"&#38;#60;",
           "gt":">",
           "amp":"&#38;#38;",
           "apos":"'",
@@ -181,12 +181,14 @@ class XMLTokenizer(object):
             return ("Characters", "&")
         else:
             # Named entity.
+            end = ";"
             name = c + stream.charsUntil(";")
 
             # Check whether or not the last character returned can be
             # discarded or needs to be put back.
             c = stream.char()
             if c != ";":
+                end = ""
                 # XXX parse error
                 pass
 
@@ -200,7 +202,7 @@ class XMLTokenizer(object):
                     return ("Stream", "")
             else:
                 # XXX parse error
-                return ("Characters", "&" + name + ";")
+                return ("Characters", "&" + name + end)
         assert 0
 
     def consumeNumberEntityOnly(self):
@@ -312,8 +314,7 @@ class XMLTokenizer(object):
             # Tokenization ends.
             return False
         else:
-            self.tokenQueue.append({"type":"Characters",
-              "data":data + self.stream.charsUntil(("&", "<"))})
+            self.tokenQueue.append({"type":"Characters","data":data})
         return True
 
     def tagState(self):
@@ -1162,7 +1163,7 @@ class XMLTokenizer(object):
             self.emitCurrentToken()
         else:
             # XXX parse error
-            # reconsume?
+            self.stream.queue.insert(0, data)
             self.state = self.states["tagAttributeNameBefore"]
         return True
 
