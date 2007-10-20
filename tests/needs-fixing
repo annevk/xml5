@@ -3,3 +3,18 @@
 #errors
 #document
 | <y> (, y, )
+
+#data
+<x y="&amp;"/>
+#errors
+#document
+| <x> (, x, )
+|   y="&" (, y, )
+
+#data
+<!DOCTYPE y [<!ENTITY t "&#38;#38; &#38;#38;#38; &amp;amp;">]><x id="&t;">&t;</x>
+#errors
+#document
+| <x> (, x, )
+|   id="& &#38; &amp;" (, id, )
+|   "& &#38; &amp;"
