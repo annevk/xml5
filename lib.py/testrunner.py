@@ -13,7 +13,7 @@ def runtests():
         result = parser.parse(input).printTree()
         if result != "#document\n" + expected:
             errorAmount += 1
-            errorLog.append("Expected:\n" + expected + "\nGot:\n" + result + "\n\n")
+            errorLog.append("For:\n" + input + "\nExpected:\n" + expected + "\nGot:\n" + result + "\n\n")
     if errorAmount == 0:
         print "All Good!"
     else:

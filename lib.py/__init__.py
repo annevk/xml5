@@ -1,8 +1,6 @@
-""" 
-XML parsing library for XML5.
+#!/usr/bin/env python
 
-Example usage:
-
-XXX
 """
-from xmlparser import XMLParser
+XML parsing library for XML5.
+"""
+from parser import XMLParser
