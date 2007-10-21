@@ -111,7 +111,17 @@ class TreeBuilder(object):
                 if not tempNamespace:
                     tempNamespace = self.findNamespace(prefix)
                 token["namespace"] = tempNamespace
-            newAttributeList.append(token)
+
+            # Remove duplicate attributes
+            duplicate = False
+            for item in newAttributeList:
+                if item["localname"] == token["localname"] and\
+                  item["namespace"] == token["namespace"]:
+                    # XXX parse error
+                    duplicate = True
+                    break
+            if not duplicate:
+                newAttributeList.append(token)
         return newAttributeList
 
     def createElement(self, name, attributes):
