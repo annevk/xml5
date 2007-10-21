@@ -1,10 +1,11 @@
 from constants import spaceCharacters, digits, hexDigits, EOF
 from inputstream import XMLInputStream
+import re
 
 class XMLTokenizer(object):
     def __init__(self, stream, encoding=None):
         # The stream holds all the characters.
-        self.stream = XMLInputStream(stream, encoding)
+        self.stream = XMLInputStream(stream, self, encoding)
 
         # Set of states and the initial state
         self.states = {
@@ -88,14 +89,19 @@ class XMLTokenizer(object):
 
         # Entities
         self.entities = {
-          "lt":"&#38;#60;",
+          "lt":"&#60;",
           "gt":">",
-          "amp":"&#38;#38;",
+          "amp":"&#38;",
           "apos":"'",
           "quot":"\""
         }
         self.parameterEntities = {}
         self.attributeNormalization = []
+
+        # Dealing with entities
+        self.entityValueLen = 0
+        self.charCount = 0
+        self.entityCount = 0
 
         # Tokens yet to be processed.
         self.tokenQueue = []
@@ -110,7 +116,7 @@ class XMLTokenizer(object):
             while self.tokenQueue:
                 yield self.tokenQueue.pop(0)
 
-    def consumeNumberEntity(self, isHex, stream):
+    def consumeNumberEntity(self, isHex):
         allowed = digits
         radix = 10
         if isHex:
@@ -121,7 +127,7 @@ class XMLTokenizer(object):
 
         # Consume all the characters that are in range while making sure we
         # don't hit an EOF.
-        value = stream.charsUntil(allowed, True)
+        value = self.stream.charsUntil(allowed, True)
 
         # Convert the set of characters consumed to an int.
         charAsInt = int(value, radix)
@@ -143,75 +149,86 @@ class XMLTokenizer(object):
 
         # Discard the ; if present. Otherwise, put it back on the queue and
         # invoke parseError on parser.
-        c = stream.char()
+        c = self.stream.char()
         if c != ";":
             # XXX parse error
-            stream.queue.append(c)
+            self.stream.queue.append(c)
         return char
 
-    def consumeEntity(self, stream, loopCount=0):
-        c = stream.char()
+    def consumeEntity(self, fromAttribute=False):
+        # The result of this function is a tuple consisting of the entity
+        # value and whether it needs to be inserted into the stream or
+        # simply appended as character data.
+        c = self.stream.char()
         if c == "#":
             # Character reference (numeric entity).
-
             value = "&#"
-            c = stream.char()
+            c = self.stream.char()
             if c == "x":
-                c = stream.char()
+                c = self.stream.char()
                 if c in hexdigits:
                     # Hexadecimal entity detected.
-                    stream.queue.insert(0, c)
-                    value = self.consumeNumberEntity(True, stream)
+                    self.stream.queue.insert(0, c)
+                    value = self.consumeNumberEntity(True)
                 else:
                     value += "x"
             elif c in digits:
                 # Decimal entity detected.
-                stream.queue.insert(0, c)
-                value = self.consumeNumberEntity(False, stream)
+                self.stream.queue.insert(0, c)
+                value = self.consumeNumberEntity(False)
             elif c == EOF:
                 # XXX parse error
                 pass
             else:
                 # XXX parse error
                 value += c
-            return ("Characters", value)
+            return "Characters", value
         # Break out if we reach the end of the file
         elif c == EOF:
             # XXX parse error
-            return ("Characters", "&")
+            return "Characters", "&"
         else:
             # Named entity.
             end = ";"
-            name = c + stream.charsUntil(";")
+            name = c + self.stream.charsUntil(";")
 
             # Check whether or not the last character returned can be
             # discarded or needs to be put back.
-            c = stream.char()
+            c = self.stream.char()
             if c != ";":
-                end = ""
                 # XXX parse error
-                pass
+                end = ""
 
             if name in self.entities:
-                # XXX Before returning this as stream all & occurances in
-                # self.entities[name] need to replaced with their value etc.
-                # taking into account references.
-                if loopCount < 16:
-                    return ("Stream", self.normalizeEntityValue(self.entities[name], loopCount))
+                if self.entityCount < 16:
+                    self.entityCount += 1
+                    value = self.entities[name]
+                    if fromAttribute:
+                        # This is a hack to make things "work". Or is it
+                        # really the only good solution?
+                        value = re.sub("\n", "&#10;", value)
+                        value = re.sub("\r", "&#10;", value)
+                        value = re.sub("\t", "&#9;", value)
+                        value = re.sub(" ", "&#32;", value)
+                        value = re.sub("\"", "&#34;", value)
+                        value = re.sub("'", "&#39;", value)
+                    self.entityValueLen += len(value)
+                    return "Stream", value
                 else:
-                    return ("Stream", "")
+                    # XXX parse error
+                    return "Characters", ""
             else:
                 # XXX parse error
-                return ("Characters", "&" + name + end)
+                return "Characters", "&" + name + end
         assert 0
 
     def consumeNumberEntityOnly(self):
         c = self.stream.char()
         value = "&"
-        if c != "#":
-            value += c
-        elif c == EOF:
+        if c == EOF:
             self.stream.queue.insert(0, c)
+        elif c != "#":
+            value += c
         else:
             value += "#"
             c = self.stream.char()
@@ -220,13 +237,13 @@ class XMLTokenizer(object):
                 if c in hexdigits:
                     # Hexadecimal entity detected.
                     self.stream.queue.insert(0, c)
-                    value = self.consumeNumberEntity(True, self.stream)
+                    value = self.consumeNumberEntity(True)
                 else:
                     value += "x"
             elif c in digits:
                 # Decimal entity detected.
                 self.stream.queue.insert(0, c)
-                value = self.consumeNumberEntity(False, self.stream)
+                value = self.consumeNumberEntity(False)
             elif c == EOF:
                 # XXX parse error
                 pass
@@ -242,24 +259,14 @@ class XMLTokenizer(object):
             # XXX parse error
             pass
 
-        if name in self.parameterEntities:
-            return self.parameterEntities[name]
+        if name in self.parameterEntities and self.entityCount < 16:
+            self.entityCount += 1
+            value = self.parameterEntities[name]
+            self.entityValueLen += len(value)
+            return value
         else:
+            # XXX parse error
             return ""
-
-    def normalizeEntityValue(self, value, loopCount):
-        stream = XMLInputStream(value)
-        loopCount += 1
-        newValue = ""
-        while True:
-            c = stream.char()
-            if c == "&":
-                newValue += self.consumeEntity(stream, loopCount)[1]
-            elif c == EOF:
-                break
-            else:
-                newValue += c
-        return newValue
 
     def attributeNameExists(self, name):
         for x,y in self.currentToken["attributes"]:
@@ -300,14 +307,14 @@ class XMLTokenizer(object):
     def dataState(self):
         data = self.stream.char()
         if data == "&":
-            entity = self.consumeEntity(self.stream)
-            if entity[0] == "Stream":
-                self.stream.queue.extend(entity[1])
-            elif entity[0] == "Characters":
-                self.tokenQueue.append({"type":"Characters",
-                  "data":entity[1]})
+            entity = self.consumeEntity()
+            if entity[0] == "Characters":
+                self.tokenQueue.append({"type":"Characters","data":entity[1]})
             else:
-                assert 0
+                i = 0
+                for x in entity[1]:
+                    self.stream.queue.insert(i, x)
+                    i += 1
         elif data == "<":
             self.state = self.states["tag"]
         elif data == EOF:
@@ -1265,7 +1272,14 @@ class XMLTokenizer(object):
         if data == "\"":
             self.state = self.states["tagAttributeNameBefore"]
         elif data == "&":
-            self.currentToken["attributes"][-1][1] += self.consumeEntity(self.stream)[1]
+            entity = self.consumeEntity(True)
+            if entity[0] == "Characters":
+                self.currentToken["attributes"][-1][1] += entity[1]
+            else:
+                i = 0
+                for x in entity[1]:
+                    self.stream.queue.insert(i, x)
+                    i += 1
         elif data == EOF:
             # XXX parse error
             self.emitCurrentToken()
@@ -1277,9 +1291,16 @@ class XMLTokenizer(object):
     def tagAttributeValueSingleQuotedState(self):
         data = self.stream.char()
         if data == "'":
-            self.state = self.states["beforeAttributeName"]
+            self.state = self.states["tagAttributeNameBefore"]
         elif data == "&":
-            self.currentToken["attributes"][-1][1] += self.consumeEntity(self.stream)[1]
+            entity = self.consumeEntity(True)
+            if entity[0] == "Characters":
+                self.currentToken["attributes"][-1][1] += entity[1]
+            else:
+                i = 0
+                for x in entity[1]:
+                    self.stream.queue.insert(i, x)
+                    i += 1
         elif data == EOF:
             # XXX parse error
             self.emitCurrentToken()
@@ -1293,7 +1314,14 @@ class XMLTokenizer(object):
         if data in spaceCharacters:
             self.state = self.states["tagAttributeNameBefore"]
         elif data == "&":
-            self.currentToken["attributes"][-1][1] += self.consumeEntity(self.stream)[1]
+            entity = self.consumeEntity(True)
+            if entity[0] == "Characters":
+                self.currentToken["attributes"][-1][1] += entity[1]
+            else:
+                i = 0
+                for x in entity[1]:
+                    self.stream.queue.insert(i, x)
+                    i += 1
         elif data == ">":
             self.emitCurrentToken()
         elif data == EOF:

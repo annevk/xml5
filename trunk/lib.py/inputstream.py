@@ -4,17 +4,20 @@ import re
 EOF = None
 
 class XMLInputStream(object):
-    def __init__(self, source, encoding=None):
-        """XMLInputStream(source, [encoding]) -> Normalized stream from source
-        for use by the XMLTokenizer.
+    def __init__(self, source, tokenizer, encoding=None):
+        """XMLInputStream(source, tokenizer, [encoding])
 
         source can be either a file-object, local filename or a string.
         """
 
         # List of where new lines occur
         self.newLines = []
+        
+        # Need a reference to the tokenizer object to deal with the madness
+        # that is XML entities
+        self.tokenizer = tokenizer
 
-        # Raw Stream
+        # The octet stream
         self.rawStream = self.openStream(source)
 
         self.defaultEncoding = "UTF-8"
@@ -25,10 +28,10 @@ class XMLInputStream(object):
             encoding = self.detectEncoding()
         self.charEncoding = encoding
 
-        # Read bytes from stream decoding them into Unicode
+        # The Unicode string
         uString = self.rawStream.read().decode(self.charEncoding, 'replace')
 
-        # Normalize new ipythonlines and null characters
+        # Normalize newlines and null characters
         uString = re.sub('\r\n?', '\n', uString)
         uString = re.sub('\x00', u'\uFFFD', uString)
 
@@ -124,6 +127,13 @@ class XMLInputStream(object):
         """Read one character from the stream or queue if available. Return
         EOF when EOF is reached.
         """
+        if self.tokenizer.entityCount > 0:
+            self.tokenizer.charCount += 1
+            if self.tokenizer.charCount > self.tokenizer.entityValueLen:
+                self.tokenizer.entityValueLen = 0
+                self.tokenizer.charCount = 0
+                self.tokenizer.entityCount = 0
+        
         if self.queue:
             return self.queue.pop(0)
         else:
