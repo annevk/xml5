@@ -47,6 +47,13 @@ Bogus comment
 |   "x"
 
 #data
+<!DOCTYPE y [<!ENTITY x '&x;x'>]><y>&x;</y>
+#errors
+#document
+| <y> (, y, )
+|   "xxxxxxxxxxxxxxxx"
+
+#data
 <!DOCTYPE x [
  <!ATTLIST x x CDATA #FIXED "TEST">
  <!ATTLIST x x CDATA #FIXED "FOOBAR">
@@ -181,3 +188,56 @@ Bogus comment
 #document
 | <x> (, x, )
 |   "<<"
+
+#data
+<!DOCTYPE y [<!ENTITY t '"'>]><y t="&t;"/>
+#errors
+#document
+| <y> (, y, )
+|   t=""" (, t, )
+
+#data
+<!DOCTYPE y [<!ENTITY t ' "&#39;'>]><y a=&t; b='&t;' c="&t;"/>
+#errors
+#document
+| <y> (, y, )
+|   a=" "'" (, a, )
+|   b=" "'" (, b, )
+|   c=" "'" (, c, )
+
+#data
+<!DOCTYPE y [<!ENTITY % a '&#37;b;'><!ENTITY % b '&#37;a;'>%a;]><y/>
+#errors
+#document
+| <y> (, y, )
+
+#data
+<x y="&amp;"/>
+#errors
+#document
+| <x> (, x, )
+|   y="&" (, y, )
+
+#data
+<!DOCTYPE y [<!ENTITY t "&#38;#38; &#38;#38;#38; &amp;amp;">]><x id="&t;">&t;</x>
+#errors
+#document
+| <x> (, x, )
+|   id="& &#38; &amp;" (, id, )
+|   "& &#38; &amp;"
+
+#data
+<x id=x id=y>
+#errors
+#document
+| <x> (, x, )
+|   id="x" (, id, )
+
+#data
+<x xmlns:x="a" xmlns:y="a" x:id="" y:id=""/>
+#errors
+#document
+| <x> (, x, )
+|   xmlns:x="a" (xmlns, x, http://www.w3.org/2000/xmlns/)
+|   xmlns:y="a" (xmlns, y, http://www.w3.org/2000/xmlns/)
+|   x:id="" (x, id, a)
