@@ -12,8 +12,8 @@ specifically).
 The implementation and specification both currently lack attribute
 normalization as defined by the XML 1.0/1.1 specification. There's also no
 encoding sniffer defined or implemented yet that deals with
-<?xml encoding="utf-8"?> and such.
+`<?xml encoding="utf-8"?>` and such.
 
 An updated version of the specification appears to be maintained here:
 
-  https://github.com/Ygg01/xml5_draft
+https://github.com/Ygg01/xml5_draft
